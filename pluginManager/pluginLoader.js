@@ -10,39 +10,6 @@ var async = require('async');
     pluginManager.upgrade = function() {};
 
     pluginManager.load = function() {
-        fs.exists(PLUGINDIR, function(exists) {
-            if (exists) {
-                async.waterfall([
-                        async.apply(fs.stat, PLUGINDIR),
-
-                        function(status, cb) {
-                            if (status.isDirectory()) {
-                                fs.readdir(PLUGINDIR, cb);
-                            } else {
-                                async.waterfall([
-                                    async.apply(fs.unlink, PLUGINDIR),
-                                    async.apply(fs.mkdir, PLUGINDIR)
-                                ], function(err) {
-                                    cb(err, []);
-                                });
-                            }
-                        }
-                    ],
-                    function(err, files) {
-                        if (err) {
-                            console.log(err);
-                        } else {
-                            console.log(files);
-                        }
-                    });
-            } else {
-                fs.mkdir(PLUGINDIR, function(err) {
-                    if (err) {
-                        console.log(err);
-                    }
-                });
-            }
-        });
     };
 
     pluginManager.validate = function() {};
@@ -63,3 +30,22 @@ var async = require('async');
     }
 
 }());
+
+function mkdirf(path, callback) {
+    fs.exists(path, function(exists) {
+        if (exists) {
+            fs.stat(path, function(err, status) {
+                if (status.isDirectory()) {
+                    callback(null);
+                } else {
+                    async.series([
+                        async.apply(fs.unlink, path),
+                        async.apply(fs.mkdir, path)
+                    ], callback);
+                }
+            });
+        } else {
+            fs.mkdir(path, callback);
+        }
+    });
+}
