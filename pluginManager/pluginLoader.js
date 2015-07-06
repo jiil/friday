@@ -1,4 +1,5 @@
 var Fs = require('fs');
+var Path = require('path');
 var Async = require('async');
 var Utils = require('../utils/utils.js');
 
@@ -6,8 +7,7 @@ var Utils = require('../utils/utils.js');
     'use strict';
     var pluginManager = {};
     var root = this;
-    var PLUGINDIR = process.env.HOME + '/.friday/plugins';
-    //var PLUGINDIR = process.env.HOME ;
+    var PLUGINDIR = Path.join(process.env.HOME ,'.friday','plugins');
 
     pluginManager.upgrade = function() {};
 
