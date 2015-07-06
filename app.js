@@ -1,2 +1,2 @@
 var pluginManager = require("./pluginManager/pluginLoader.js");
-pluginManager.load();
+pluginManager.load(function(err){ });

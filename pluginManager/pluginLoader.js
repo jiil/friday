@@ -1,5 +1,7 @@
-var fs = require('fs');
-var async = require('async');
+var Fs = require('fs');
+var Async = require('async');
+var Utils = require('../utils/utils.js');
+
 (function() {
     'use strict';
     var pluginManager = {};
@@ -9,7 +11,12 @@ var async = require('async');
 
     pluginManager.upgrade = function() {};
 
-    pluginManager.load = function() {
+    pluginManager.load = function(callback) {
+        Async.waterfall([
+            Async.apply(Utils.mkdirfp, PLUGINDIR),
+            Async.apply(Fs.readdir, PLUGINDIR),
+            Async.asyncify(console.log)
+            ],callback);
     };
 
     pluginManager.validate = function() {};
@@ -30,22 +37,3 @@ var async = require('async');
     }
 
 }());
-
-function mkdirf(path, callback) {
-    fs.exists(path, function(exists) {
-        if (exists) {
-            fs.stat(path, function(err, status) {
-                if (status.isDirectory()) {
-                    callback(null);
-                } else {
-                    async.series([
-                        async.apply(fs.unlink, path),
-                        async.apply(fs.mkdir, path)
-                    ], callback);
-                }
-            });
-        } else {
-            fs.mkdir(path, callback);
-        }
-    });
-}
