@@ -1,4 +1,3 @@
-var Fs = require('fs');
 var Path = require('path');
 var Async = require('async');
 var Utils = require('../utils/utils.js');
@@ -7,15 +6,18 @@ var Utils = require('../utils/utils.js');
     'use strict';
     var pluginManager = {};
     var root = this;
-    var PLUGINDIR = Path.join(process.env.HOME ,'.friday','plugins');
+    //var CONFIGDIR = Path.join(process.env.HOME ,'.friday','plugins');
+    var SRCDIR = Path.join(__dirname, '..');
+    var PLUGINDIR = Path.join(SRCDIR, 'plugins');
 
     pluginManager.upgrade = function() {};
 
     pluginManager.load = function(callback) {
         Async.waterfall([
-            Async.apply(Utils.mkdirfp, PLUGINDIR),
-            Async.apply(Fs.readdir, PLUGINDIR),
-            Async.asyncify(console.log)
+            //TODO NOCONFIG NOW : Async.apply(Utils.mkdirfp, CONFIGDIR),
+            Async.apply(Utils.mkdirFP, PLUGINDIR),
+            Async.apply(Utils.readdirR, PLUGINDIR),
+            Async.asyncify(console.log),
             ],callback);
     };
 
