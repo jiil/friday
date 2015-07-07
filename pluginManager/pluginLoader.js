@@ -13,12 +13,38 @@ var Utils = require('../utils/utils.js');
     pluginManager.upgrade = function() {};
 
     pluginManager.load = function(callback) {
+        var plug = {
+            points: {},
+            plugins: {}
+        };
         Async.waterfall([
             //TODO NOCONFIG NOW : Async.apply(Utils.mkdirfp, CONFIGDIR),
             Async.apply(Utils.mkdirFP, PLUGINDIR),
             Async.apply(Utils.readdirR, PLUGINDIR),
-            Async.asyncify(console.log),
-            ],callback);
+            function(files, cb) {
+                Async.each(files, function(file, ecb) {
+                    if (file.match(/\.point\.yaml$/)) {
+                        console.log(file);
+                        Utils.readYaml(Path.join(PLUGINDIR, file), function(err, point) {
+                            plug.points[point.name] = point;
+                            ecb(err);
+                        });
+                    } else if (file.match(/\.plugin\.yaml$/)) {
+                        console.log(file);
+                        Utils.readYaml(Path.join(PLUGINDIR, file), function(err, plugin) {
+                            plug.plugins[plugin.name] = plugin;
+                            ecb(err);
+                        });
+                    } else {
+                        ecb(null);
+                    }
+                }, function(err) {
+                    cb(err)
+                });
+            }
+        ], function(err) {
+            callback(err, plug)
+        });
     };
 
     pluginManager.validate = function() {};

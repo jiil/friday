@@ -2,6 +2,7 @@ var Fs = require('fs');
 var Async = require('async');
 var Path = require('path');
 var _ = require('underscore');
+var Yaml = require('js-yaml');
 
 (function() {
     'use strict';
@@ -49,6 +50,7 @@ var _ = require('underscore');
     
 
     utils.readdirR = readdirR;
+
     function readdirR(path, callback){
         Async.waterfall([
                 Async.apply(Fs.readdir, path),
@@ -76,6 +78,21 @@ var _ = require('underscore');
                 });
     }
 
+    utils.readYaml = readYaml;
+
+    function readYaml(path, callback) {
+        Async.waterfall([
+            Async.apply(Fs.readFile, path, 'utf8'),
+            function(data, cb) {
+                try {
+                    var obj = Yaml.safeLoad(data);
+                    cb(null, obj);
+                } catch (e) {
+                    cb(e, null);
+                }
+            }
+        ], callback);
+    }
 
     // Node.js
     if (typeof module !== 'undefined' && module.exports) {
