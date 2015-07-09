@@ -10,15 +10,26 @@ var Utils = require('../utils/utils.js');
     var SRCDIR = Path.join(__dirname, '..');
     var PLUGINDIR = Path.join(SRCDIR, 'plugins');
 
+    /**
+     * Description
+     * @method upgrade
+     * @return 
+     */
     pluginManager.upgrade = function() {};
 
+    /**
+     * Description
+     * @method load
+     * @param {} callback
+     * @return 
+     */
     pluginManager.load = function(callback) {
         var plug = {
             points: {},
             plugins: {}
         };
         Async.waterfall([
-            //TODO NOCONFIG NOW : Async.apply(Utils.mkdirfp, CONFIGDIR),
+            //TODO NO CONFIG NOW : Async.apply(Utils.mkdirfp, CONFIGDIR),
             Async.apply(Utils.mkdirFP, PLUGINDIR),
             Async.apply(Utils.readdirR, PLUGINDIR),
             function(files, cb) {
@@ -26,13 +37,13 @@ var Utils = require('../utils/utils.js');
                     if (file.match(/\.point\.yaml$/)) {
                         console.log(file);
                         Utils.readYaml(Path.join(PLUGINDIR, file), function(err, point) {
-                            plug.points[point.name] = point;
+                            plug.points[point.point_name] = point;
                             ecb(err);
                         });
                     } else if (file.match(/\.plugin\.yaml$/)) {
                         console.log(file);
                         Utils.readYaml(Path.join(PLUGINDIR, file), function(err, plugin) {
-                            plug.plugins[plugin.name] = plugin;
+                            plug.plugins[plugin.plugin_name] = plugin;
                             ecb(err);
                         });
                     } else {
@@ -47,6 +58,11 @@ var Utils = require('../utils/utils.js');
         });
     };
 
+    /**
+     * Description
+     * @method validate
+     * @return 
+     */
     pluginManager.validate = function() {};
 
     // Node.js
