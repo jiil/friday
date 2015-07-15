@@ -13,20 +13,22 @@ var Utils = require('../utils/utils.js');
     pluginManager.upgrade = function() {};
 
     pluginManager.load = function(callback) {
-        var plug = {
-            points: {},
-            plugins: {}
-        };
+        readPluginDir(PLUGINDIR, callback);
+    };
+
+    function readPluginDir(pluginDir, callback){
+        var plugins = [];
         Async.waterfall([
             //TODO NO CONFIG NOW : Async.apply(Utils.mkdirfp, CONFIGDIR),
-            Async.apply(Utils.mkdirFP, PLUGINDIR),
-            Async.apply(Utils.readdirR, PLUGINDIR),
+            Async.apply(Utils.mkdirFP, pluginDir),
+            Async.apply(Utils.readdirR, pluginDir),
             function(files, cb) {
                 Async.each(files, function(file, ecb) {
                     if (file.match(/\.plugin\.yaml$/)) {
                         console.log(file);
-                        Utils.readYaml(Path.join(PLUGINDIR, file), function(err, plugin) {
-                            plug.plugins[plugin.plugin_name] = plugin;
+                        Utils.readYaml(Path.join(pluginDir, file), function(err, plugin) {
+                            plugin.PLUGIN_PATH = Path.join(pluginDir, file);
+                            plugins.push(plugin);
                             ecb(err);
                         });
                     } else {
@@ -37,11 +39,12 @@ var Utils = require('../utils/utils.js');
                 });
             }
         ], function(err) {
-            callback(err, plug);
+            callback(err, plugins);
         });
-    };
+    }
+
     /**
-     * - plugin 구조는 다음과 같다.
+     * - PLUGIN 구조는 다음과 같다.
      * PLUGIN_NAME: string
      * DESCRIPTION: string
      * DEPENDENCIES: PLUGIN_NAME:PLUGIN_VERSION list
@@ -50,17 +53,29 @@ var Utils = require('../utils/utils.js');
      *
      * - POINT 구조는 다음과 같다.
      * NAME: string
-     * VERSION: int
+     * VERSION: string [number][number]*(.[number][number]*)*
      * DESCRIPTION: string
-     * SCHEMAS: SCHEMA list 
+     * ARGUMENTS: string
+     * RESOURCE_STRUCTURES: RESOURCE_STRUCTURE list 
      *
-     *
-     * - SCHEMA 의 구조는 다음과 같다. 
+     * - RESOURCE_STRUCTURE 의 구조는 다음과 같다. 
+     * NAME: string
+     * TYPE: string string|number|object|module|command
+     * MANDATORY_KEY_LIST : string list (use only for object)
+     * METHOD_NAME: string (used only for module)
+     * PROGRAM_NAME: string (used only for command)
+     * ARGUMENT_LIST: string list (used only for command)
      *
      * - EXTENSION 의 구조는 다음과 같다.  
+     * POINT_NAME: string
+     * POINT_VERSION: string [number][number]*(.[number][number]*)*
+     * EXTENSION_TYPE: string
+     * DESCRIPTION: string
+     * RESOURCES: RESOURCE list
      *
-     *
+     * - RESOURCE that defined from RESOURCE_STRUCTURES
      */
+
     function validatePoint(points, callback){
         callback(err, points);
     }

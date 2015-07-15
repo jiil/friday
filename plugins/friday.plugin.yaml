@@ -1,0 +1,18 @@
+PLUGIN_NAME: FRIDAY
+DESCRIPTION: friday default plugins
+DEPENDENCIES: []
+POINTS: 
+    - NAME: FRIDAY.WAITER.PATH
+      VERSION: 0
+      DESCRIPTION: waiter path support
+      ARGUMENTS: http.request
+      RESOURCE_STRUCTURES:
+        - {NAME: pluginName, TYPE: string}
+EXTENSIONS:
+    - POINT_NAME: FRIDAY.WAITER.PATH
+      POINT_VERSION: 0
+      EXTENSION_TYPE: default
+      DESCRIPTION: sample waiter path 
+      RESOURCES:
+        - {pluginName: friday}
+
