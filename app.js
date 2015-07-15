@@ -1,10 +1,5 @@
 var Async = require('async');
-var pluginManager = require("./pluginManager/pluginLoader.js");
-
-/**
- * @callback errCallback
- * @param {err} Error object
- */
+var pluginManager = require('./pluginManager/pluginLoader.js');
 
 Async.waterfall([
     Async.apply(pluginManager.load),

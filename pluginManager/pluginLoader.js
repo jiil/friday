@@ -10,19 +10,8 @@ var Utils = require('../utils/utils.js');
     var SRCDIR = Path.join(__dirname, '..');
     var PLUGINDIR = Path.join(SRCDIR, 'plugins');
 
-    /**
-     * Description
-     * @method upgrade
-     * @return 
-     */
     pluginManager.upgrade = function() {};
 
-    /**
-     * Description
-     * @method load
-     * @param {} callback
-     * @return 
-     */
     pluginManager.load = function(callback) {
         var plug = {
             points: {},
@@ -34,13 +23,7 @@ var Utils = require('../utils/utils.js');
             Async.apply(Utils.readdirR, PLUGINDIR),
             function(files, cb) {
                 Async.each(files, function(file, ecb) {
-                    if (file.match(/\.point\.yaml$/)) {
-                        console.log(file);
-                        Utils.readYaml(Path.join(PLUGINDIR, file), function(err, point) {
-                            plug.points[point.point_name] = point;
-                            ecb(err);
-                        });
-                    } else if (file.match(/\.plugin\.yaml$/)) {
+                    if (file.match(/\.plugin\.yaml$/)) {
                         console.log(file);
                         Utils.readYaml(Path.join(PLUGINDIR, file), function(err, plugin) {
                             plug.plugins[plugin.plugin_name] = plugin;
@@ -50,19 +33,39 @@ var Utils = require('../utils/utils.js');
                         ecb(null);
                     }
                 }, function(err) {
-                    cb(err)
+                    cb(err);
                 });
             }
         ], function(err) {
-            callback(err, plug)
+            callback(err, plug);
         });
     };
-
     /**
-     * Description
-     * @method validate
-     * @return 
+     * - plugin 구조는 다음과 같다.
+     * PLUGIN_NAME: string
+     * DESCRIPTION: string
+     * DEPENDENCIES: PLUGIN_NAME:PLUGIN_VERSION list
+     * POINTS: POINT list
+     * EXTENSIONS: EXTENSION list
+     *
+     * - POINT 구조는 다음과 같다.
+     * NAME: string
+     * VERSION: int
+     * DESCRIPTION: string
+     * SCHEMAS: SCHEMA list 
+     *
+     *
+     * - SCHEMA 의 구조는 다음과 같다. 
+     *
+     * - EXTENSION 의 구조는 다음과 같다.  
+     *
+     *
      */
+    function validatePoint(points, callback){
+        callback(err, points);
+    }
+
+
     pluginManager.validate = function() {};
 
     // Node.js
