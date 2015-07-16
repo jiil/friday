@@ -6,7 +6,7 @@ POINTS:
       VERSION: 0
       DESCRIPTION: waiter path support
       ARGUMENTS: http.request
-      RESOURCE_STRUCTURES:
+      STRUCTURES:
         - {NAME: pluginName, TYPE: string}
 EXTENSIONS:
     - POINT_NAME: FRIDAY.WAITER.PATH

@@ -4,7 +4,7 @@ var pluginManager = require('./pluginManager/pluginLoader.js');
 Async.waterfall([
     Async.apply(pluginManager.load),
     function(plugins, cb) {
-        console.log(plugins);
+        console.log(JSON.stringify(plugins));
         cb(null);
     }
 ], function(err) {
