@@ -16,7 +16,7 @@ var _ = require('underscore');
     pluginManager.load = function(callback) {
         Async.waterfall([
             Async.apply(readPluginDir, PLUGINDIR),
-            generatePlugins
+            generatePlugs
         ], function(err, plugins) {
             callback(err, plugins);
         });
@@ -57,23 +57,22 @@ var _ = require('underscore');
      * - PLUGIN 구조는 다음과 같다.
      * PLUGIN_NAME: string
      * DESCRIPTION: string
-     * DEPENDENCIES: PLUGIN_NAME:PLUGIN_VERSION list
+     * DEPENDENCIES: PLUGIN_NAME#PLUGIN_VERSION list
      * POINTS: POINT list
      * EXTENSIONS: EXTENSION list
      *
      * - POINT 구조는 다음과 같다.
      * NAME: string
-     * VERSION: string [number][number]*(.[number][number]*)*
+     * VERSION: string [number]+(.[number]+)*
      * DESCRIPTION: string
      * ARGUMENTS: string
      * STRUCTURES: STRUCTURE list 
      *
      * - STRUCTURE 의 구조는 다음과 같다. 
      * NAME: string
-     * TYPE: string string|number|object|module|method
+     * TYPE: string string|number|object|module
      * MANDATORY_KEY_LIST : string list (use only for object)
      * MODULE_PATH: string (used only for module and method)
-     * METHOD_NAME: string (used only for module)
      *
      * - EXTENSION 의 구조는 다음과 같다.  
      * POINT_NAME: string
@@ -86,7 +85,6 @@ var _ = require('underscore');
      *
      * - in memory structure
      * {
-     *      
      *      plugins:
      *          PLUGIN_NAME:
      *              DESCRIPTION:
@@ -94,6 +92,7 @@ var _ = require('underscore');
      *              PLUGIN_PATH:
      *      points:
      *          NAME#VERSION:
+     *              PLUGIN_NAME:
      *              DESCRIPTION:
      *              ARGUMENTS:
      *              STRUCTURES:
@@ -101,7 +100,8 @@ var _ = require('underscore');
      *                    TYPE:
      *                    option:
      *      extensions:
-     *          POINT_NAME#VERSION: 
+     *          POINT_NAME#VERSION:
+     *              PLUGIN_NAME:
      *              EXTENSION_TYPE:
      *              DESCRIPTION:
      *              RESOURCES:
@@ -109,39 +109,112 @@ var _ = require('underscore');
      *
      */
 
-    function generatePlugins(yamls, callback){
-        var plugins = {};
-        var points = {};
-        var extensions = {};
-        _.each(yamls, function(yaml) {
-            var plugin = getPlugin(yaml);
-            if (plugin) {
-                plugins[plugin.PLUGIN_NAME] = plugin;
+    
+    function generatePlugs(yamls, callback){
+        var plugs = {
+            plugins: {},
+            points: {},
+            extensions: {},
+        };
+        var usablePlugins = _.filter(yamls, isPluginUsable);
+        _.each(usablePlugins, function(plugin){
+            plugs.plugins[plugin.PLUGIN_NAME] = {
+                DESCRIPTON : (plugin.DESCRIPTION)? plugin.DESCRIPTION : "",
+                DEPENDENCIES : (plugin.DEPENDENCIES)? plugin.DEPENDENCIES : [],
+                PLUGIN_PATH : plugin.PLUGIN_PATH
             }
-            if (yaml.POINTS && !_.isEmpty(yaml.POINTS)) {
-                _.each(yaml.POINTS, function(point) {
-                    var newPoint = getPoint(point);
-                    if(newPoint){
-                        newPoint.PLUGIN_NAME = plugin.PLUGIN_NAME;
-                        points[newPoint.NAME] = newPoint;
-                    }
-                });
-            }
-            if (yaml.EXTENSIONS && !_.isEmpty(yaml.EXTENSIONS)) {
-                _.each(yaml.EXTENSIONS, function(extension) {
-                    var newExtension = getExtension(extension);
-                    if(newExtension){
-                        newExtension.PLUGIN_NAME = plugin.PLUGIN_NAME;
-                        newExtension.PLUGIN_PATH = plugin.PLUGIN_PATH;
-                        extensions[newExtension.POINT_NAME] = newExtension;
-                    }
-                });
-            }
+
         });
 
-        var err = null;
-        callback(err, plugins);
+        callback(null, plugs);
     }
+
+    //check olny requirement not validate
+    function isPluginUsable(yaml){
+        if (typeof yaml.PLUGIN_PATH !== 'string') {
+            console.log("PLUG ERROR : invalid format of PLUGIN_PATH");
+            console.log(yaml);
+            return false;
+        }
+
+        if (typeof yaml.PLUGIN_NAME !== 'string') {
+            console.log("PLUG ERROR : invalid format of PLUGIN_NAME");
+            console.log(yaml);
+            return false;
+        }
+
+        if (yaml.DEPENDENCIES) {
+            if (typeof yaml.DEPENDENCIES !== 'object' ||
+                !_.isArray(yaml.DEPENDENCIES) ||
+                !_.every(yaml.DEPENDENCIES, isDependencyUsable)
+            ) {
+                console.log("PLUG ERROR : invalid format of DEPENDENCIES");
+                console.log(yaml);
+                return false
+            }
+        }
+
+        if (yaml.POINTS) {
+            if (typeof yaml.POINTS !== 'object' ||
+                !_.isArray(yaml.POINTS) ||
+                !_.every(yaml.POINTS, isPointUsable)
+            ) {
+                console.log("PLUG ERROR : invalid format of POINTS");
+                console.log(yaml);
+                return false
+            }
+        }
+
+        if (yaml.EXTENSIONS) {
+            if (typeof yaml.EXTENSIONS !== 'object' ||
+                !_.isArray(yaml.EXTENSIONS) ||
+                !_.every(yaml.EXTENSIONS, isExtensionUsable)
+            ) {
+                console.log("PLUG ERROR : invalid format of EXTENSIONS");
+                console.log(yaml);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function isDependencyUsable(dependency) {
+        return (typeof dependency === 'string' &&
+            dependency.match(/[^# \t]+#[0-9.]+/));
+    }
+
+    function isPointUsable(point) {
+        if(typeof point.VERSION === 'number'){
+            point.VERSION = "" + point.VERSION;
+        }
+        return (typeof point.NAME === 'string' &&
+            typeof point.VERSION === 'string' &&
+            point.VERSION.match(/^[0-9]+(\.[0-9]+)*$/) &&
+            typeof point.STRUCTURES === 'object' &&
+            _.isArray(point.STRUCTURES) &&
+            _.every(point.STRUCTURES, isStructureUsable)
+        )
+    }
+
+    function isStructureUsable(structure) {
+        return (typeof structure.NAME === 'string' &&
+            typeof structure.type === 'string')
+    }
+
+    function isExtensionUsable(extension) {
+        if(typeof extension.POINT_VERSION === 'number'){
+            extension.POINT_VERSION = "" + extension.POINT_VERSION;
+        }
+        return (typeof extension.POINT_NAME === 'string' &&
+            typeof extension.POINT_VERSION === 'string' &&
+            extension.POINT_VERSION.match(/^[0-9]+(\.[0-9]+)*$/) &&
+            typeof extension.RESOURCES === 'object' &&
+            _.isArray(extension.RESOURCES));
+    }
+
+
+
 
     function getExtension(extension) {
         if (extension.POINT_NAME && extension.POINT_VERSION && extension.EXTENSION_TYPE && extension.RESOURCES && !_.isEmpty(extension.RESOURCES)){
