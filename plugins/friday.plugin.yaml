@@ -13,6 +13,6 @@ EXTENSIONS:
       POINT_VERSION: 0
       EXTENSION_TYPE: default
       DESCRIPTION: sample waiter path 
-      RESOURCES:
-        - {pluginName: friday}
+      RESOURCE: 
+        pluginName: friday
 

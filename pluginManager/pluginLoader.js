@@ -1,3 +1,4 @@
+var fs = require('fs');
 var Path = require('path');
 var Async = require('async');
 var Utils = require('../utils/utils.js');
@@ -78,7 +79,7 @@ var _ = require('underscore');
      * POINT_VERSION: string [number][number]*(.[number][number]*)*
      * EXTENSION_TYPE: string
      * DESCRIPTION: string
-     * RESOURCES: RESOURCE list
+     * RESOURCE: RESOURCE object
      *
      * - RESOURCE that defined from STRUCTURES
      *
@@ -102,7 +103,7 @@ var _ = require('underscore');
      *              EXTENSION_TYPE:
      *                  PLUGIN_NAME:
      *                  DESCRIPTION:
-     *                  RESOURCES:
+     *                  RESOURCE:
      * }
      *
      */
@@ -128,15 +129,12 @@ var _ = require('underscore');
             // set points
             _.each(plugin.POINTS, function(point){
                 var pointIdx = point.NAME + '#' + point.VERSION;
-                if (!plugs.points[pointIdx]){ 
-                    plugs.points[pointIdx] = [];
-                }
-                plugs.points[pointIdx].push( { 
+                plugs.points[pointIdx] = { 
                     PLUGIN_NAME : plugin.PLUGIN_NAME,
                     DESCRIPTION : (point.DESCRIPTION)? point.DESCRIPTION : '',
                     ARGUMENTS : (point.ARGUMENTS)? point.ARGUMENTS : '',
                     STRUCTURES : point.STRUCTURES
-                });
+                };
             });
 
             // set extensions
@@ -154,7 +152,7 @@ var _ = require('underscore');
                 plugs.extensions[pointIdx][extension.EXTENSION_TYPE] = { 
                     PLUGIN_NAME : plugin.PLUGIN_NAME,
                     DESCRIPTION : (extension.DESCRIPTION)? extension.DESCRIPTION : '',
-                    RESOURCES : extension.RESOURCES
+                    RESOURCE : extension.RESOURCE
                 };
             });
         });
@@ -321,11 +319,9 @@ var _ = require('underscore');
             return false;
         }
 
-        if (typeof extension.RESOURCES !== 'object' ||
-            !_.isArray(extension.RESOURCES)
-        ) {
-            console.log('extension RESOURCES is not resource list.');
-            console.log(extension.RESOURCES);
+        if (typeof extension.RESOURCE !== 'object') {
+            console.log('extension RESOURCE is must be object.');
+            console.log(extension.RESOURCE);
             return false;
         }
 
@@ -340,52 +336,96 @@ var _ = require('underscore');
      * setup extension resources
      */
     function setupExtensions(plugs, callback){
-        var invalidList = {};
+        var newExtensions = {};
         var pointNameList = _.keys(plugs.points);
-        _.each(pointNameList, function(pointName){
-            _.each(plugs.extensions[pointName], function(extension, key){
-                _.each(plugs.points[pointName].STRUCTURES, function(structure){
-                    switch(structure.TYPE){
-                        case 'string':
-                        case 'boolean':
-                        case 'number':
-                        case 'object':
-                            if( typeof extension.RESOURCES[structure.NAME] !== structure.TYPE){
-                                console.log('PLUG ERROR : extension of '+ pointName + ' is invalid. see : ' + plugs.plugins[extension.PLUGIN_NAME].PLUGIN_PATH);
-                                console.log('resource ' + structure.NAME + ' type must be ' + structure.TYPE);
-                                if(invalidList[pointName]){
-                                    invalidList[pointName].push(key);
-                                }else{
-                                    invalidList[pointName] = [key];
-                                }
+        Async.each(pointNameList,function(pointName, ecb){
+            var extensionTypeNameList = _.keys(plugs.extensions[pointName]);
+            Async.each(extensionTypeNameList, function(typeName, eecb){
+                var pluginDir = Path.dirname(plugs.plugins[plugs.extensions[pointName][typeName].PLUGIN_NAME].PLUGIN_PATH);
+                getValidExtension(plugs.points[pointName].STRUCTURES, 
+                    plugs.extensions[pointName][typeName].RESOURCE, 
+                    pluginDir, 
+                    function(err, newResource){
+                        if(err){
+                            console.log(err);
+                        }else{
+                            if ( !newExtensions[pointName] ) {
+                                newExtensions[pointName] = {};
                             }
-                            break;
-                        case 'module':
-                            if( typeof extension.RESOURCES[structure.NAME] !== 'string'){
-                                //error 
-                            }
-                            //make path list
-                            //filter exist path
-                            // if path exist -> require('path')
-                            // else error
-                            break;
-                        default:
-                                console.log('PLUG ERROR : extension of '+ pointName + ' is invalid. see : ' + plugs.plugins[extension.PLUGIN_NAME].PLUGIN_PATH);
-                                console.log('resource ' + structure.NAME + ' type unknown : ' + structure.TYPE);
-                                if(invalidList[pointName]){
-                                    invalidList[pointName].push(key);
-                                }else{
-                                    invalidList[pointName] = [key];
-                                }
-                            break;
-                    }
-                });
-            });
+                            newExtensions[pointName][typeName] = {
+                                PLUGIN_NAME : plugs.extensions[pointName][typeName].PLUGIN_NAME,
+                                DESCRIPTION : plugs.extensions[pointName][typeName].DESCRIPTION,
+                                RESOURCE : newResource
+                            };
+                        }
+                        eecb(null);
+                    });
+            }, ecb);
+        },function(err){
+            if(err){
+                callback(err, plugs);
+            }else{
+                plugs.extensions = newExtensions;
+                callback(null, plugs);
+            }
         });
-        console.log(pointNameList);
-        callback(null, plugs);
     }
 
+    function getValidExtension(resourceStructures, resource, pluginDir, callback) {
+        var newResource = {}
+        Async.each(resourceStructures, function(structure, ecb) {
+            switch (structure.TYPE) {
+                case 'string':
+                case 'boolean':
+                case 'number':
+                case 'object':
+                    if (typeof resource[structure.NAME] !== structure.TYPE) {
+                        ecb(new Error(structure.NAME + ' is not (a/an) ' + structure.TYPE));
+                    }else{
+                        newResource[structure.NAME] = resource[structure.NAME];
+                        ecb(null);
+                    }
+                    break;
+                case 'module':
+                    if (typeof resource[structure.NAME] === 'string') {
+                        var modulePaths = [Path.join(pluginDir, resource[structure.NAME]), resource[structure.NAME]];
+                        Async.filter(modulePaths, fs.exists, function(modulePathList) {
+                            if (modulePathList.length > 0) {
+                                var module = null;
+                                var error = null;
+                                try {
+                                    module = require(modulePathList[0]);
+                                } catch(e){
+                                    error = e;
+                                }
+                                if(error){
+                                    ecb(error);
+                                } else if(module){
+                                    newResource[structure.NAME] = module;
+                                    ecb(null);
+                                } else {
+                                    ecb(new Error('Can not load ' + structure.NAME + ' module : ' + modulePaths[0]));
+                                }
+                            } else {
+                                ecb(new Error(structure.NAME + ' module path not exist : ' + modulePaths[0]));
+                            }
+                        });
+                    } else {
+                        ecb(new Error(structure.NAME + ' is not a module path format : ' + resource[structure.NAME].toString()));
+                    }
+                    break;
+                default:
+                    ecb(new Error('Not support ' + structure.NAME + ' of structure type as ' + structure.TYPE));
+                    break;
+            }
+        }, function(err) {
+            if (err) {
+                callback(err, null);
+            } else {
+                callback(err, newResource);
+            }
+        });
+    }
 
     pluginManager.validate = function() {};
 
