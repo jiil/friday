@@ -16,7 +16,8 @@ var _ = require('underscore');
     pluginManager.load = function(callback) {
         Async.waterfall([
             Async.apply(readPluginDir, PLUGINDIR),
-            generatePlugs
+            generatePlugs,
+            setupExtensions
         ], function(err, plugins) {
             callback(err, plugins);
         });
@@ -70,9 +71,7 @@ var _ = require('underscore');
      *
      * - STRUCTURE 의 구조는 다음과 같다. 
      * NAME: string
-     * TYPE: string string|number|object|module
-     * MANDATORY_KEY_LIST : string list (use only for object)
-     * MODULE_PATH: string (used only for module and method)
+     * TYPE: string boolean|string|number|object|module
      *
      * - EXTENSION 의 구조는 다음과 같다.  
      * POINT_NAME: string
@@ -98,13 +97,12 @@ var _ = require('underscore');
      *              STRUCTURES:
      *                  - NAME:
      *                    TYPE:
-     *                    option:
      *      extensions:
-     *          POINT_NAME#VERSION:
-     *              PLUGIN_NAME:
+     *          POINT_NAME#POINT_VERSION:
      *              EXTENSION_TYPE:
-     *              DESCRIPTION:
-     *              RESOURCES:
+     *                  PLUGIN_NAME:
+     *                  DESCRIPTION:
+     *                  RESOURCES:
      * }
      *
      */
@@ -117,13 +115,48 @@ var _ = require('underscore');
             extensions: {},
         };
         var usablePlugins = _.filter(yamls, isPluginUsable);
+
+        // set plugin
         _.each(usablePlugins, function(plugin){
+            // set plugins
             plugs.plugins[plugin.PLUGIN_NAME] = {
-                DESCRIPTON : (plugin.DESCRIPTION)? plugin.DESCRIPTION : "",
+                DESCRIPTION : (plugin.DESCRIPTION)? plugin.DESCRIPTION : '',
                 DEPENDENCIES : (plugin.DEPENDENCIES)? plugin.DEPENDENCIES : [],
                 PLUGIN_PATH : plugin.PLUGIN_PATH
             }
 
+            // set points
+            _.each(plugin.POINTS, function(point){
+                var pointIdx = point.NAME + '#' + point.VERSION;
+                if (!plugs.points[pointIdx]){ 
+                    plugs.points[pointIdx] = [];
+                }
+                plugs.points[pointIdx].push( { 
+                    PLUGIN_NAME : plugin.PLUGIN_NAME,
+                    DESCRIPTION : (point.DESCRIPTION)? point.DESCRIPTION : '',
+                    ARGUMENTS : (point.ARGUMENTS)? point.ARGUMENTS : '',
+                    STRUCTURES : point.STRUCTURES
+                });
+            });
+
+            // set extensions
+            _.each(plugin.EXTENSIONS, function(extension){
+                var pointIdx = extension.POINT_NAME + '#' + extension.POINT_VERSION;
+                if (!plugs.extensions[pointIdx]){ 
+                    plugs.extensions[pointIdx] = {};
+                }
+
+                if (plugs.extensions[pointIdx][extension.EXTENSION_TYPE]){
+                    console.log('PLUG ERROR : '+ pointIdx + '.' + extension.EXTENSION_TYPE + 'is overwrited!');
+                    console.log(plugs.extensions[pointIdx][extension.EXTENSION_TYPE]);
+                }
+
+                plugs.extensions[pointIdx][extension.EXTENSION_TYPE] = { 
+                    PLUGIN_NAME : plugin.PLUGIN_NAME,
+                    DESCRIPTION : (extension.DESCRIPTION)? extension.DESCRIPTION : '',
+                    RESOURCES : extension.RESOURCES
+                };
+            });
         });
 
         callback(null, plugs);
@@ -131,48 +164,62 @@ var _ = require('underscore');
 
     //check olny requirement not validate
     function isPluginUsable(yaml){
+
+        // plugin path check 
         if (typeof yaml.PLUGIN_PATH !== 'string') {
-            console.log("PLUG ERROR : invalid format of PLUGIN_PATH");
+            console.log('PLUG ERROR : invalid format of PLUGIN_PATH');
             console.log(yaml);
             return false;
         }
 
-        if (typeof yaml.PLUGIN_NAME !== 'string') {
-            console.log("PLUG ERROR : invalid format of PLUGIN_NAME");
-            console.log(yaml);
+        // plugin name check
+        if (typeof yaml.PLUGIN_NAME !== 'string' || !isValidKey(yaml.PLUGIN_NAME)) {
+            console.log('PLUG ERROR : PLUGIN_NAME type format is invalid. NAME format is => /[a-zA-Z0-9._-]+/ see :' + yaml.PLUGIN_PATH);
+            console.log(yaml.PLUGIN_NAME);
             return false;
         }
 
+        // plugin dependencies check
         if (yaml.DEPENDENCIES) {
             if (typeof yaml.DEPENDENCIES !== 'object' ||
-                !_.isArray(yaml.DEPENDENCIES) ||
-                !_.every(yaml.DEPENDENCIES, isDependencyUsable)
+                !_.isArray(yaml.DEPENDENCIES)
             ) {
-                console.log("PLUG ERROR : invalid format of DEPENDENCIES");
-                console.log(yaml);
+                console.log('PLUG ERROR : DEPENDENCIES must be dependency list. see :' + yaml.PLUGIN_PATH);
+                console.log(yaml.DEPENDENCIES);
+                return false
+            }
+            if ( !_.every(yaml.DEPENDENCIES, isDependencyUsable)){
+                console.log('PLUG ERROR : dependency of DEPENDENCIES is invalid. see :' + yaml.PLUGIN_PATH);
                 return false
             }
         }
 
+        // plugin points check
         if (yaml.POINTS) {
             if (typeof yaml.POINTS !== 'object' ||
-                !_.isArray(yaml.POINTS) ||
-                !_.every(yaml.POINTS, isPointUsable)
+                !_.isArray(yaml.POINTS)
             ) {
-                console.log("PLUG ERROR : invalid format of POINTS");
-                console.log(yaml);
+                console.log('PLUG ERROR : POINTS must be potnt list. see :' + yaml.PLUGIN_PATH);
+                return false
+            }
+            if ( !_.every(yaml.POINTS, isPointUsable)){
+                console.log('PLUG ERROR : point of POINTS is invalid. see :' + yaml.PLUGIN_PATH);
                 return false
             }
         }
 
+        // plugin extensions check
         if (yaml.EXTENSIONS) {
             if (typeof yaml.EXTENSIONS !== 'object' ||
-                !_.isArray(yaml.EXTENSIONS) ||
-                !_.every(yaml.EXTENSIONS, isExtensionUsable)
+                !_.isArray(yaml.EXTENSIONS)
             ) {
-                console.log("PLUG ERROR : invalid format of EXTENSIONS");
-                console.log(yaml);
+                console.log('PLUG ERROR : EXTENSIONS must be extension list. sed :' + yaml.PLUGIN_PATH);
+                console.log(yaml.EXTENSIONS);
                 return false;
+            }
+            if ( !_.every(yaml.EXTENSIONS, isExtensionUsable)){
+                console.log('PLUG ERROR : extension of EXTENSIONS is invalid. see :' + yaml.PLUGIN_PATH);
+                return false
             }
         }
 
@@ -180,128 +227,163 @@ var _ = require('underscore');
     }
 
     function isDependencyUsable(dependency) {
-        return (typeof dependency === 'string' &&
-            dependency.match(/[^# \t]+#[0-9.]+/));
+
+        // dependency check
+        if (typeof dependency !== 'string' ||
+            !dependency.match(/^[^# \t]+#[0-9]+(\.[0-9]+)*$/)
+        ) {
+            console.log('dependency format is invalid. dependency format is => /^PLUGIN_NAME#PLUGIN_VERSION$/');
+            console.log(dependency);
+            return false;
+        }
+
+        return true
     }
 
     function isPointUsable(point) {
-        if(typeof point.VERSION === 'number'){
-            point.VERSION = "" + point.VERSION;
+
+        //name check 
+        if(typeof point.NAME !== 'string' || !isValidKey(point.NAME)){
+            console.log('point NAME format is invalid. NAME format is => /[a-zA-Z0-9._-]+');
+            console.log(point.NAME);
+            return false;
         }
-        return (typeof point.NAME === 'string' &&
-            typeof point.VERSION === 'string' &&
-            point.VERSION.match(/^[0-9]+(\.[0-9]+)*$/) &&
-            typeof point.STRUCTURES === 'object' &&
-            _.isArray(point.STRUCTURES) &&
-            _.every(point.STRUCTURES, isStructureUsable)
-        )
+
+        //version check
+        if(typeof point.VERSION === 'number'){
+            point.VERSION = '' + point.VERSION;
+        }
+
+        if (typeof point.VERSION !== 'string' ||
+            !point.VERSION.match(/^[0-9]+(\.[0-9]+)*$/)
+        ) {
+            console.log('point VERSION format is invalid. VERSION format is => /^[0-9]+(\\.[0-9]+)*$/');
+            console.log(point.VERSION);
+            return false;
+        }
+
+        //structures check
+        if (typeof point.STRUCTURES !== 'object' ||
+            !_.isArray(point.STRUCTURES)
+        ) {
+            console.log('point STRUCTURES is not structure list.');
+            console.log(point.STRUCTURES);
+            return false;
+        }
+
+        if ( !_.every(point.STRUCTURES, isStructureUsable)){
+            console.log('structure of STRUCTURES is invalid formatted.');
+            console.log(point.STRUCTURES);
+            return false;
+        }
+
+        return true;
     }
 
     function isStructureUsable(structure) {
-        return (typeof structure.NAME === 'string' &&
-            typeof structure.type === 'string')
+
+        // structure name check
+        if (typeof structure.NAME !== 'string' || !isValidKey(structure.NAME)){
+            console.log('structure NAME format is invalid. NAME format is => /[a-zA-Z0-9._-]+');
+            console.log(structure.NAME);
+            return false;
+        }
+
+        // structure type check
+        if (typeof structure.TYPE !== 'string' || _.indexOf(['string', 'boolean', 'number', 'object', 'module'],structure.TYPE) === -1){
+            console.log('structure TYPE can be \'string\' or \'boolean\' or \'number\' or \'object\' or \'module\'.');
+            console.log(structure.TYPE);
+            return false;
+        }
+
+        return true;
     }
 
     function isExtensionUsable(extension) {
+
+        //extension point name check 
+        if(typeof extension.POINT_NAME !== 'string' || !isValidKey(extension.POINT_NAME)){
+            console.log('extension POINT_NAME format is invalid. POINT_NAME format is => /[a-zA-Z0-9._-]+');
+            console.log(extension.POINT_NAME);
+            return false;
+        }
+
         if(typeof extension.POINT_VERSION === 'number'){
-            extension.POINT_VERSION = "" + extension.POINT_VERSION;
+            extension.POINT_VERSION = '' + extension.POINT_VERSION;
         }
-        return (typeof extension.POINT_NAME === 'string' &&
-            typeof extension.POINT_VERSION === 'string' &&
-            extension.POINT_VERSION.match(/^[0-9]+(\.[0-9]+)*$/) &&
-            typeof extension.RESOURCES === 'object' &&
-            _.isArray(extension.RESOURCES));
+
+        //extension point version check 
+        if ( typeof extension.POINT_VERSION !== 'string' ||
+            !extension.POINT_VERSION.match(/^[0-9]+(\.[0-9]+)*$/)
+        ) {
+            console.log('extension POINT_VERSION format is invalid. POINT_VERSION format is => /^[0-9]+(\\.[0-9]+)*$/');
+            console.log(extension.POINT_VERSION);
+            return false;
+        }
+
+        if (typeof extension.RESOURCES !== 'object' ||
+            !_.isArray(extension.RESOURCES)
+        ) {
+            console.log('extension RESOURCES is not resource list.');
+            console.log(extension.RESOURCES);
+            return false;
+        }
+
+        return true;
     }
 
-
-
-
-    function getExtension(extension) {
-        if (extension.POINT_NAME && extension.POINT_VERSION && extension.EXTENSION_TYPE && extension.RESOURCES && !_.isEmpty(extension.RESOURCES)){
-            var newExtension = {};
-            newExtension.POINT_NAME = extension.POINT_NAME;
-            newExtension.POINT_VERSION = extension.POINT_VERSION;
-            newExtension.EXTENSION_TYPE = extension.EXTENSION_TYPE;
-            newExtension.RESOURCES = extension.RESOURCES;
-            return extension;
-        }else{
-            return null;
-        }
+    function isValidKey(string){
+        return string.match(/^[a-zA-Z0-9._-]+$/)
     }
 
-    function getPoint(point) {
-        if (point.NAME && point.VERSION && point.STRUCTURES && !_.isEmpty(point.STRUCTURES)) {
-            var structures = _.map(point.STRUCTURES, getStructure);
-            if (_.every(structures, _.identity)) {
-                var newPoint = {};
-                newPoint.NAME = point.NAME;
-                newPoint.VERSION = point.VERSION;
-                newPoint.STRUCTURES = structures;
-            } else {
-                return null;
-            }
-        } else {
-            return null;
-        }
-    }
-
-    function getStructure(structure) {
-        if (structure.NAME && structure.TYPE) {
-            var newStructure = {
-                NAME: structure.NAME,
-                TYPE: structure.TYPE
-            };
-            switch (structure.TYPE) {
-                case 'command':
-                    newStructure.ARGUMENT_LIST = (structure.ARGUMENT_LIST) ? structure.ARGUMENT_LIST : [];
-                    if (structure.PROGRAM_NAME) {
-                        newStructure.PROGRAM_NAME = structure.PROGRAM_NAME;
-                    } else {
-                        newStructure = null;
+    /** 
+     * setup extension resources
+     */
+    function setupExtensions(plugs, callback){
+        var invalidList = {};
+        var pointNameList = _.keys(plugs.points);
+        _.each(pointNameList, function(pointName){
+            _.each(plugs.extensions[pointName], function(extension, key){
+                _.each(plugs.points[pointName].STRUCTURES, function(structure){
+                    switch(structure.TYPE){
+                        case 'string':
+                        case 'boolean':
+                        case 'number':
+                        case 'object':
+                            if( typeof extension.RESOURCES[structure.NAME] !== structure.TYPE){
+                                console.log('PLUG ERROR : extension of '+ pointName + ' is invalid. see : ' + plugs.plugins[extension.PLUGIN_NAME].PLUGIN_PATH);
+                                console.log('resource ' + structure.NAME + ' type must be ' + structure.TYPE);
+                                if(invalidList[pointName]){
+                                    invalidList[pointName].push(key);
+                                }else{
+                                    invalidList[pointName] = [key];
+                                }
+                            }
+                            break;
+                        case 'module':
+                            if( typeof extension.RESOURCES[structure.NAME] !== 'string'){
+                                //error 
+                            }
+                            //make path list
+                            //filter exist path
+                            // if path exist -> require('path')
+                            // else error
+                            break;
+                        default:
+                                console.log('PLUG ERROR : extension of '+ pointName + ' is invalid. see : ' + plugs.plugins[extension.PLUGIN_NAME].PLUGIN_PATH);
+                                console.log('resource ' + structure.NAME + ' type unknown : ' + structure.TYPE);
+                                if(invalidList[pointName]){
+                                    invalidList[pointName].push(key);
+                                }else{
+                                    invalidList[pointName] = [key];
+                                }
+                            break;
                     }
-                    break;
-                case 'method':
-                    if (structure.METHOD_NAME && structure.MODULE_PATH) {
-                        newStructure.METHOD_NAME = structure.METHOD_NAME;
-                        newStructure.MODULE_PATH = structure.MODULE_PATH;
-                    } else {
-                        newStructure = null;
-                    }
-                    break;
-                case 'moudule':
-                    if (structure.MODULE_PATH) {
-                        newStructure.MODULE_PATH = structure.MODULE_PATH;
-                    } else {
-                        newStructure = null;
-                    }
-                    break;
-                case 'object':
-                    newStructure.MANDATORY_KEY_LIST = (structure.MANDATORY_KEY_LIST) ? structure.MANDATORY_KEY_LIST : [];
-                    break;
-                case 'number':
-                case 'string':
-                    break;
-                default:
-                    newStructure = null;
-                    break;
-            }
-            return newStructure;
-        } else {
-            return null;
-        }
-    }
-
-    function getPlugin(plugin) {
-        if (plugin.PLUGIN_NAME && plugin.PLUGIN_PATH) {
-            var newPlugin = {};
-            newPlugin.PLUGIN_NAME = plugin.PLUGIN_NAME;
-            newPlugin.PLUGIN_PATH = plugin.PLUGIN_PATH;
-            newPlugin.DESCRIPTION = (plugin.DESCRIPTION) ? plugin.DESCRIPTION : '';
-            newPlugin.DEPENDENCIES = (plugin.DEPENDENCIES) ? plugin.DESCRIPTION : [];
-            return newPlugin;
-        } else {
-            return null;
-        }
+                });
+            });
+        });
+        console.log(pointNameList);
+        callback(null, plugs);
     }
 
 

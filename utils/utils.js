@@ -14,13 +14,6 @@ var Yaml = require('js-yaml');
 
     utils.mkdirFP = mkdirFP;
 
-    /**
-     * Description
-     * @method mkdirFP 
-     * @param {string} path
-     * @param {callback(err)} callback
-     * @return fucntion(err)
-     */
     function mkdirFP(path, callback) {
         var dirname = Path.dirname(path);
         Fs.exists(dirname, function(exists) {
@@ -37,13 +30,6 @@ var Yaml = require('js-yaml');
 
     utils.mkdirF = mkdirF;
 
-    /**
-     * Description
-     * @method mkdirF
-     * @param {} path
-     * @param {} callback
-     * @return 
-     */
     function mkdirF(path, callback) {
         Fs.exists(path, function(exists) {
             if (exists) {
@@ -68,13 +54,6 @@ var Yaml = require('js-yaml');
 
     utils.readdirR = readdirR;
 
-    /**
-     * Description
-     * @method readdirR
-     * @param {} path
-     * @param {} callback
-     * @return 
-     */
     function readdirR(path, callback){
         Async.waterfall([
                 Async.apply(Fs.readdir, path),
@@ -104,13 +83,6 @@ var Yaml = require('js-yaml');
 
     utils.readYaml = readYaml;
 
-    /**
-     * Description
-     * @method readYaml
-     * @param {} path
-     * @param {} callback
-     * @return 
-     */
     function readYaml(path, callback) {
         Async.waterfall([
             Async.apply(Fs.readFile, path, 'utf8'),
@@ -124,6 +96,8 @@ var Yaml = require('js-yaml');
             }
         ], callback);
     }
+
+
 
     // Node.js
     if (typeof module !== 'undefined' && module.exports) {

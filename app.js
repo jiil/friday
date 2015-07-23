@@ -5,6 +5,7 @@ Async.waterfall([
     Async.apply(pluginManager.load),
     function(plugins, cb) {
         console.log(JSON.stringify(plugins));
+        console.log(plugins);
         cb(null);
     }
 ], function(err) {
