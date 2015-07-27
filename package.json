@@ -9,7 +9,8 @@
     "dependencies": {
         "async": "*",
         "underscore" : "*",
-        "js-yaml" : "*"
+        "js-yaml" : "*",
+        "express" : "*"
    },
     "devDependencies": {
     }

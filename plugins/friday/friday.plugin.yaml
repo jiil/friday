@@ -1,0 +1,21 @@
+PLUGIN_NAME: FRIDAY
+DESCRIPTION: friday default plugins
+DEPENDENCIES: []
+POINTS: 
+    - NAME: WAITER.ROUTER.GET
+      VERSION: 0
+      DESCRIPTION: waiter get url
+      ARGUMENTS: http.request, http.respond
+      STRUCTURES:
+        - {NAME: module, TYPE: module}
+        - {NAME: getFunction, TYPE: string}
+EXTENSIONS:
+    - POINT_NAME: WAITER.ROUTER.GET
+      POINT_VERSION: 0
+      EXTENSION_TYPE: /
+      DESCRIPTION: sample api route
+      RESOURCE: 
+        module: plugin.js
+        getFunction: get
+
+
