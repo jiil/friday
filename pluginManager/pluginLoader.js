@@ -59,8 +59,8 @@ var _ = require('underscore');
     /**
      * plugin dir
      * /-
-     *   -*.plugin.yaml
-     *   -.plugin.js
+     *   - *.plugin.yaml
+     *   - plugin.js
      *
      * - PLUGIN 구조는 다음과 같다.
      * PLUGIN_NAME: string
@@ -372,51 +372,39 @@ var _ = require('underscore');
     function setupExtensions(plugs, callback) {
         var newExtensions = {};
         var pointNameList = _.keys(plugs.points);
-        Async.each(pointNameList, function(pointName, ecb) {
+
+        _.each(pointNameList, function(pointName){
             var extensionTypeNameList = _.keys(plugs.extensions[pointName]);
-            Async.each(extensionTypeNameList, function(typeName, eecb) {
-                getValidExtension(plugs.points[pointName].STRUCTURES,
-                    plugs.extensions[pointName][typeName].RESOURCE,
-                    plugs.plugins[plugs.extensions[pointName][typeName].PLUGIN_NAME],
-                    function(err, newResource) {
-                        if (err) {
-                            console.log(err);
-                        } else {
-                            if (!newExtensions[pointName]) {
-                                newExtensions[pointName] = {};
-                            }
-                            newExtensions[pointName][typeName] = {
-                                PLUGIN_NAME: plugs.extensions[pointName][typeName].PLUGIN_NAME,
-                                DESCRIPTION: plugs.extensions[pointName][typeName].DESCRIPTION,
-                                RESOURCE: newResource
-                            };
-                        }
-                        eecb(null);
-                    });
-            }, ecb);
-        }, function(err) {
-            if (err) {
-                callback(err, plugs);
-            } else {
-                plugs.extensions = newExtensions;
-                callback(null, plugs);
-            }
+            _.each(extensionTypeNameList, function(typeName){
+                var newResource = getValidExtension(plugs.points[pointName].STRUCTURES, plugs.extensions[pointName][typeName].RESOURCE, plugs.plugins[plugs.extensions[pointName][typeName].PLUGIN_NAME]);
+                if (!newExtensions[pointName]) {
+                    newExtensions[pointName] = {};
+                }
+                newExtensions[pointName][typeName] = {
+                    PLUGIN_NAME: plugs.extensions[pointName][typeName].PLUGIN_NAME,
+                    DESCRIPTION: plugs.extensions[pointName][typeName].DESCRIPTION,
+                    RESOURCE: newResource
+                };
+            });
         });
+
+        plugs.extensions = newExtensions;
+        callback(null, plugs);
     }
 
-    function getValidExtension(resourceStructures, resource, plugin, callback) {
+    function getValidExtension(resourceStructures, resource, plugin) {
         var newResource = {};
-        Async.each(resourceStructures, function(structure, ecb) {
+        var allPassed = _.every(resourceStructures, function(structure){
             switch (structure.TYPE) {
                 case 'string':
                 case 'boolean':
                 case 'number':
                 case 'object':
                     if (typeof resource[structure.NAME] !== structure.TYPE) {
-                        ecb(new Error(structure.NAME + ' is not (a/an) ' + structure.TYPE));
+                        console.log(structure.NAME + ' is not (a/an) ' + structure.TYPE);
                     } else {
                         newResource[structure.NAME] = resource[structure.NAME];
-                        ecb(null);
+                        return true;
                     }
                     break;
                 case 'function':
@@ -424,28 +412,29 @@ var _ = require('underscore');
                         if(plugin.MODULE){
                             if(typeof plugin.MODULE[resource[structure.NAME]] === 'function'){
                                 newResource[structure.NAME] = plugin.MODULE[resource[structure.NAME]];
-                                ecb(null);
+                                return true;
                             }else{
-                                ecb(new Error('plugin has no function name ' + resource[structure.NAME]));
+                                console.log('plugin has no function name ' + resource[structure.NAME]);
                             }
                         }else{
-                            ecb(new Error('plugin has no module'));
+                            console.log('plugin has no module');
                         }
                     } else {
-                        ecb(new Error(structure.NAME + ' is not a function name format: ' + resource[structure.NAME]));
+                        console.log(structure.NAME + ' is not a function name format: ' + resource[structure.NAME]);
                     }
                     break;
                 default:
-                    ecb(new Error('Not support ' + structure.NAME + ' of structure type as ' + structure.TYPE));
+                        console.log('Not support ' + structure.NAME + ' of structure type as ' + structure.TYPE);
                     break;
             }
-        }, function(err) {
-            if (err) {
-                callback(err, null);
-            } else {
-                callback(err, newResource);
-            }
+            return false
         });
+
+        if(allPassed){
+            return newResource;
+        }else{
+            return null;
+        }
     }
 
     pluginManager.validate = function() {};
