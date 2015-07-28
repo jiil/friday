@@ -18,6 +18,7 @@ var _ = require('underscore');
         Async.waterfall([
             Async.apply(readPluginDir, PLUGINDIR),
             generatePlugs,
+            setupPlugins,
             setupExtensions
         ], function(err, plugins) {
             callback(err, plugins);
@@ -64,8 +65,7 @@ var _ = require('underscore');
      * - PLUGIN 구조는 다음과 같다.
      * PLUGIN_NAME: string
      * DESCRIPTION: string
-     * MODULE: string  module path 를 가진다.
-     * DEPENDENCIES: PLUGIN_NAME#PLUGIN_VERSION list
+     * DEPENDENCIES: PLUGIN_NAME
      * POINTS: POINT list
      * EXTENSIONS: EXTENSION list
      *
@@ -114,7 +114,6 @@ var _ = require('underscore');
      * }
      *
      */
-
 
     function generatePlugs(yamls, callback) {
         var plugs = {
@@ -235,9 +234,9 @@ var _ = require('underscore');
 
         // dependency check
         if (typeof dependency !== 'string' ||
-            !dependency.match(/^[^# \t]+#[0-9]+(\.[0-9]+)*$/)
+            !dependency.match(/^[^# \t\n]+$/)
         ) {
-            console.log('dependency format is invalid. dependency format is => /^PLUGIN_NAME#PLUGIN_VERSION$/');
+            console.log('dependency format is invalid. dependency does not include white space');
             console.log(dependency);
             return false;
         }
@@ -295,8 +294,8 @@ var _ = require('underscore');
         }
 
         // structure type check
-        if (typeof structure.TYPE !== 'string' || _.indexOf(['string', 'boolean', 'number', 'object', 'module'], structure.TYPE) === -1) {
-            console.log('structure TYPE can be \'string\' or \'boolean\' or \'number\' or \'object\' or \'module\'.');
+        if (typeof structure.TYPE !== 'string' || _.indexOf(['string', 'boolean', 'number', 'object', 'function'], structure.TYPE) === -1) {
+            console.log('structure TYPE can be \'string\' or \'boolean\' or \'number\' or \'object\' or \'function\'.');
             console.log(structure.TYPE);
             return false;
         }
@@ -339,6 +338,34 @@ var _ = require('underscore');
         return string.match(/^[a-zA-Z0-9._-]+$/);
     }
 
+    /**
+     * setup plugins 
+     */
+    function setupPlugins(plugs, callback){
+        Async.forEachOf(plugs.plugins, function(plugin, name, fcb){
+            var modulePath = Path.join(Path.dirname(plugin.PLUGIN_PATH), 'plugin.js');
+            fs.exists(modulePath, function(exist){
+                if(exist){
+                    var newModule = null;
+                    try{
+                        newModule = require(modulePath);
+                        plugs.plugins[name].MODULE = newModule;
+                    }catch(e){
+                        console.log('Can\'t read '+ name + ' plugin module : ' + modulePath);
+                        console.log(e);
+                        newModule = null;
+                        plugs.plugins[name].MODULE = newModule;
+                    }
+                }else{
+                    plugs.plugins[name].MODULE = null;
+                }
+                fcb(null);
+            });
+        },function(err){
+            callback(err, plugs);
+        });
+    }
+
     /** 
      * setup extension resources
      */
@@ -348,10 +375,9 @@ var _ = require('underscore');
         Async.each(pointNameList, function(pointName, ecb) {
             var extensionTypeNameList = _.keys(plugs.extensions[pointName]);
             Async.each(extensionTypeNameList, function(typeName, eecb) {
-                var pluginDir = Path.dirname(plugs.plugins[plugs.extensions[pointName][typeName].PLUGIN_NAME].PLUGIN_PATH);
                 getValidExtension(plugs.points[pointName].STRUCTURES,
                     plugs.extensions[pointName][typeName].RESOURCE,
-                    pluginDir,
+                    plugs.plugins[plugs.extensions[pointName][typeName].PLUGIN_NAME],
                     function(err, newResource) {
                         if (err) {
                             console.log(err);
@@ -378,7 +404,7 @@ var _ = require('underscore');
         });
     }
 
-    function getValidExtension(resourceStructures, resource, pluginDir, callback) {
+    function getValidExtension(resourceStructures, resource, plugin, callback) {
         var newResource = {};
         Async.each(resourceStructures, function(structure, ecb) {
             switch (structure.TYPE) {
@@ -393,32 +419,20 @@ var _ = require('underscore');
                         ecb(null);
                     }
                     break;
-                case 'module':
+                case 'function':
                     if (typeof resource[structure.NAME] === 'string') {
-                        var modulePaths = [Path.join(pluginDir, resource[structure.NAME]), resource[structure.NAME]];
-                        Async.filter(modulePaths, fs.exists, function(modulePathList) {
-                            if (modulePathList.length > 0) {
-                                var module = null;
-                                var error = null;
-                                try {
-                                    module = require(modulePathList[0]);
-                                } catch (e) {
-                                    error = e;
-                                }
-                                if (error) {
-                                    ecb(error);
-                                } else if (module) {
-                                    newResource[structure.NAME] = module;
-                                    ecb(null);
-                                } else {
-                                    ecb(new Error('Can not load ' + structure.NAME + ' module : ' + modulePaths[0]));
-                                }
-                            } else {
-                                ecb(new Error(structure.NAME + ' module path not exist : ' + modulePaths[0]));
+                        if(plugin.MODULE){
+                            if(typeof plugin.MODULE[resource[structure.NAME]] === 'function'){
+                                newResource[structure.NAME] = plugin.MODULE[resource[structure.NAME]];
+                                ecb(null);
+                            }else{
+                                ecb(new Error('plugin has no function name ' + resource[structure.NAME]));
                             }
-                        });
+                        }else{
+                            ecb(new Error('plugin has no module'));
+                        }
                     } else {
-                        ecb(new Error(structure.NAME + ' is not a module path format : ' + resource[structure.NAME].toString()));
+                        ecb(new Error(structure.NAME + ' is not a function name format: ' + resource[structure.NAME]));
                     }
                     break;
                 default:

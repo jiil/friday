@@ -7,15 +7,13 @@ POINTS:
       DESCRIPTION: waiter get url
       ARGUMENTS: http.request, http.respond
       STRUCTURES:
-        - {NAME: module, TYPE: module}
-        - {NAME: getFunction, TYPE: string}
+        - {NAME: getFunction, TYPE: function}
 EXTENSIONS:
     - POINT_NAME: WAITER.ROUTER.GET
       POINT_VERSION: 0
       EXTENSION_TYPE: /
       DESCRIPTION: sample api route
       RESOURCE: 
-        module: plugin.js
         getFunction: get
 
 

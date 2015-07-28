@@ -5,9 +5,13 @@ var pluginLoader = require('./pluginManager/pluginLoader.js');
 
 
 pluginLoader.load(function(err, plugs) {
-    'use strict';
-    _.each(plugs.extensions['WAITER.ROUTER.GET#0'], function(extension, key) {
-        app.get(key, extension.RESOURCE.module[extension.RESOURCE.getFunction]);
+
+    app.get('/plugins',function(req, res){
+        res.send(plugs);
+    });
+
+    _.each(plugs.extensions['WAITER.ROUTER.GET#0'], function(extension, route) {
+        app.get(route, extension.RESOURCE.getFunction);
     });
 
     app.listen('8080');
