@@ -341,27 +341,27 @@ var _ = require('underscore');
     /**
      * setup plugins 
      */
-    function setupPlugins(plugs, callback){
-        Async.forEachOf(plugs.plugins, function(plugin, name, fcb){
+    function setupPlugins(plugs, callback) {
+        Async.forEachOf(plugs.plugins, function(plugin, name, fcb) {
             var modulePath = Path.join(Path.dirname(plugin.PLUGIN_PATH), 'plugin.js');
-            fs.exists(modulePath, function(exist){
-                if(exist){
+            fs.exists(modulePath, function(exist) {
+                if (exist) {
                     var newModule = null;
-                    try{
+                    try {
                         newModule = require(modulePath);
                         plugs.plugins[name].MODULE = newModule;
-                    }catch(e){
-                        console.log('Can\'t read '+ name + ' plugin module : ' + modulePath);
+                    } catch (e) {
+                        console.log('Can\'t read ' + name + ' plugin module : ' + modulePath);
                         console.log(e);
                         newModule = null;
                         plugs.plugins[name].MODULE = newModule;
                     }
-                }else{
+                } else {
                     plugs.plugins[name].MODULE = null;
                 }
                 fcb(null);
             });
-        },function(err){
+        }, function(err) {
             callback(err, plugs);
         });
     }
@@ -373,9 +373,9 @@ var _ = require('underscore');
         var newExtensions = {};
         var pointNameList = _.keys(plugs.points);
 
-        _.each(pointNameList, function(pointName){
+        _.each(pointNameList, function(pointName) {
             var extensionTypeNameList = _.keys(plugs.extensions[pointName]);
-            _.each(extensionTypeNameList, function(typeName){
+            _.each(extensionTypeNameList, function(typeName) {
                 var newResource = getValidExtension(plugs.points[pointName].STRUCTURES, plugs.extensions[pointName][typeName].RESOURCE, plugs.plugins[plugs.extensions[pointName][typeName].PLUGIN_NAME]);
                 if (!newExtensions[pointName]) {
                     newExtensions[pointName] = {};
@@ -394,7 +394,7 @@ var _ = require('underscore');
 
     function getValidExtension(resourceStructures, resource, plugin) {
         var newResource = {};
-        var allPassed = _.every(resourceStructures, function(structure){
+        var allPassed = _.every(resourceStructures, function(structure) {
             switch (structure.TYPE) {
                 case 'string':
                 case 'boolean':
@@ -409,14 +409,14 @@ var _ = require('underscore');
                     break;
                 case 'function':
                     if (typeof resource[structure.NAME] === 'string') {
-                        if(plugin.MODULE){
-                            if(typeof plugin.MODULE[resource[structure.NAME]] === 'function'){
+                        if (plugin.MODULE) {
+                            if (typeof plugin.MODULE[resource[structure.NAME]] === 'function') {
                                 newResource[structure.NAME] = plugin.MODULE[resource[structure.NAME]];
                                 return true;
-                            }else{
+                            } else {
                                 console.log('plugin has no function name ' + resource[structure.NAME]);
                             }
-                        }else{
+                        } else {
                             console.log('plugin has no module');
                         }
                     } else {
@@ -424,15 +424,15 @@ var _ = require('underscore');
                     }
                     break;
                 default:
-                        console.log('Not support ' + structure.NAME + ' of structure type as ' + structure.TYPE);
+                    console.log('Not support ' + structure.NAME + ' of structure type as ' + structure.TYPE);
                     break;
             }
-            return false
+            return false;
         });
 
-        if(allPassed){
+        if (allPassed) {
             return newResource;
-        }else{
+        } else {
             return null;
         }
     }
