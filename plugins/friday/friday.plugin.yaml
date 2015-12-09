@@ -15,5 +15,11 @@ EXTENSIONS:
       DESCRIPTION: sample api route
       RESOURCE: 
         getFunction: get
+    - POINT_NAME: WAITER.ROUTER.GET
+      POINT_VERSION: 0
+      EXTENSION_TYPE: /hello
+      DESCRIPTION: sample api route
+      RESOURCE: 
+        getFunction: getHello
 
 

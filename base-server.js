@@ -10,7 +10,7 @@ Async.waterfall([
 
 	var eventTypes = plugins.extensions['serverEvent#0'];
         server = dnode({
-		receiveEvent : function (serverId, eventName, eventOptions, callback){
+		event : function (serverId, eventName, eventOptions, callback){
 			if(eventTypes && eventTypes[eventName]){
 				eventTypes[eventName].event(serverId, eventOptions, plugins);
 				callback(null);
@@ -18,14 +18,6 @@ Async.waterfall([
 				callback(new Error('there is no event as :' + eventName));
 			}
 			
-		},
-		sendEvnet : function (serverId, eventName, eventOptions, callback){
-			if(eventTypes && eventTypes[eventName]){
-				eventTypes[eventName].sendEvent(serverId, eventOptions);
-				callback(null);
-			}else{
-				callback(new Error('there is no event as :' + eventName));
-			}
 		}
         });
 	cb(null);
@@ -37,3 +29,12 @@ Async.waterfall([
 });
 
 server.listen(5004);
+
+function emit (eventName, eventOptions){
+        'use strict';
+	var d =	dnode.connect(5004);
+	d.on('remote',function(remote){
+		remote.event(,eventName,eventOptions,function(err){
+		});
+	});
+}

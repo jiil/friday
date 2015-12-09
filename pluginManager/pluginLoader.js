@@ -8,21 +8,41 @@ var _ = require('underscore');
     'use strict';
     var pluginManager = {};
     var root = this;
+    var plugs = null;
     //var CONFIGDIR = Path.join(process.env.HOME ,'.friday','plugins');
     var SRCDIR = Path.join(__dirname, '..');
     var PLUGINDIR = Path.join(SRCDIR, 'plugins');
 
-    pluginManager.upgrade = function() {};
-
-    pluginManager.load = function(callback) {
+    pluginManager.update = function(callback) {
         Async.waterfall([
             Async.apply(readPluginDir, PLUGINDIR),
             generatePlugs,
             setupPlugins,
             setupExtensions
         ], function(err, plugins) {
+	    if(!err){
+		plugs = plugins;
+	    }
             callback(err, plugins);
         });
+    };
+
+    pluginManager.load = function(callback) {
+	if(!plugs) {
+            Async.waterfall([
+                Async.apply(readPluginDir, PLUGINDIR),
+                generatePlugs,
+                setupPlugins,
+                setupExtensions
+            ], function(err, plugins) {
+	        if(!err){
+	    	plugs = plugins;
+	        }
+                callback(err, plugins);
+            });
+	} else {
+	    callback(null, plugs);
+	}
     };
 
     function readPluginDir(pluginDir, callback) {
